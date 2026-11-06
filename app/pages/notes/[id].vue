@@ -9,9 +9,30 @@ const notesStore = useNotesStore()
 const draft = ref<Note | null>(null)
 const isNotFound = ref(false)
 const validationError = ref('')
+type EditorAction = 'cancel' | 'delete' | null
+
+const pendingAction = ref<EditorAction>(null)
+const actionError = ref('')
 
 const noteId = computed(() => String(route.params.id ?? ''))
 const isNewNote = computed(() => noteId.value === 'new')
+const dialogTitle = computed(() => (
+  pendingAction.value === 'delete'
+    ? 'Удалить заметку?'
+    : 'Отменить редактирование?'
+))
+
+const dialogMessage = computed(() => (
+  pendingAction.value === 'delete'
+    ? 'Заметка будет удалена безвозвратно.'
+    : 'Все несохранённые изменения будут потеряны.'
+))
+
+const dialogConfirmLabel = computed(() => (
+  pendingAction.value === 'delete'
+    ? 'Удалить'
+    : 'Отменить редактирование'
+))
 
 function initializeDraft(): void {
   isNotFound.value = false
@@ -89,6 +110,48 @@ async function saveDraft(): Promise<void> {
   await navigateTo('/')
 }
 
+function requestCancel(): void {
+  actionError.value = ''
+  pendingAction.value = 'cancel'
+}
+
+function requestDelete(): void {
+  if (isNewNote.value) {
+    return
+  }
+
+  actionError.value = ''
+  pendingAction.value = 'delete'
+}
+
+function closeActionDialog(): void {
+  pendingAction.value = null
+}
+
+async function confirmEditorAction(): Promise<void> {
+  if (pendingAction.value === 'cancel') {
+    pendingAction.value = null
+    await navigateTo('/')
+    return
+  }
+
+  if (
+    pendingAction.value === 'delete'
+    && draft.value !== null
+  ) {
+    const isDeleted = notesStore.deleteNote(draft.value.id)
+
+    pendingAction.value = null
+
+    if (!isDeleted) {
+      actionError.value = 'Не удалось удалить заметку.'
+      return
+    }
+
+    await navigateTo('/')
+  }
+}
+
 watch(noteId, initializeDraft, {
   immediate: true,
 })
@@ -108,9 +171,20 @@ useHead({
 
 <template>
   <main>
-    <NuxtLink to="/">
+    <NuxtLink
+      v-if="isNotFound"
+      to="/"
+    >
       Назад к заметкам
     </NuxtLink>
+
+    <button
+      v-else
+      type="button"
+      @click="requestCancel"
+    >
+      Назад к заметкам
+    </button>
 
     <section v-if="isNotFound">
       <h1>Заметка не найдена</h1>
@@ -188,7 +262,38 @@ useHead({
         <button type="submit">
           Сохранить
         </button>
+
+        <button
+          type="button"
+          @click="requestCancel"
+        >
+          Отменить редактирование
+        </button>
+
+        <button
+          v-if="!isNewNote"
+          type="button"
+          @click="requestDelete"
+        >
+          Удалить заметку
+        </button>
       </form>
     </section>
-  </main>
+
+      <p
+        v-if="actionError"
+        role="alert"
+      >
+        {{ actionError }}
+      </p>
+
+      <ConfirmDialog
+        :open="pendingAction !== null"
+        :title="dialogTitle"
+        :message="dialogMessage"
+        :confirm-label="dialogConfirmLabel"
+        @confirm="confirmEditorAction"
+        @cancel="closeActionDialog"
+      />
+    </main>
 </template>
