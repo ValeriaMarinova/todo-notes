@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useNotesStore } from '~/stores/notes'
+import type { Note } from '~/types/note'
 
 const notesStore = useNotesStore()
 

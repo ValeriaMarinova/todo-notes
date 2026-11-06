@@ -5,6 +5,10 @@ const props = defineProps<{
   note: Note
 }>()
 
+const emit = defineEmits<{
+  delete: [note: Note]
+}>()
+
 const visibleTodos = computed(() => props.note.todos.slice(0, 3))
 
 const hiddenTodosCount = computed(() => (
@@ -43,5 +47,12 @@ const hiddenTodosCount = computed(() => (
     <NuxtLink :to="`/notes/${note.id}`">
       Изменить
     </NuxtLink>
+
+    <button
+        type="button"
+        @click="emit('delete', note)"
+        >
+        Удалить
+    </button>
   </article>
 </template>
