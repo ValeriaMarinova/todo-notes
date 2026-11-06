@@ -49,10 +49,34 @@ const hiddenTodosCount = computed(() => (
     </NuxtLink>
 
     <button
-        type="button"
-        @click="emit('delete', note)"
-        >
-        Удалить
+      type="button"
+      class="remove-button"
+      @click="emit('delete', note)"
+    >
+      Удалить
     </button>
   </article>
 </template>
+
+<style scoped lang="scss">
+.remove-button {
+  padding: 0.5rem 0.875rem;
+  color: #b42318;
+  font: inherit;
+  cursor: pointer;
+  background: #ffffff;
+  border: 1px solid #fda29b;
+  border-radius: 0.5rem;
+}
+
+.remove-button:hover {
+  color: #ffffff;
+  background: #b42318;
+  border-color: #b42318;
+}
+
+.remove-button:focus-visible {
+  outline: 3px solid #fda29b;
+  outline-offset: 2px;
+}
+</style>
