@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-
+import { cloneNote } from '~/utils/noteFactory'
 import type { Note } from '~/types/note'
 import {
   loadNotesFromStorage,
@@ -32,7 +32,7 @@ export const useNotesStore = defineStore('notes', () => {
     note: Note,
     storage: Storage = localStorage,
   ): boolean {
-    const noteCopy = structuredClone(note)
+    const noteCopy = cloneNote(note)
     const index = notes.value.findIndex(item => item.id === note.id)
 
     if (index === -1) {

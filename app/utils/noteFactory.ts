@@ -19,3 +19,17 @@ export function createNote(): Note {
     updatedAt: now,
   }
 }
+
+export function cloneNote(note: Note): Note {
+  return {
+    id: note.id,
+    title: note.title,
+    todos: note.todos.map(todo => ({
+      id: todo.id,
+      text: todo.text,
+      completed: todo.completed,
+    })),
+    createdAt: note.createdAt,
+    updatedAt: note.updatedAt,
+  }
+}  
