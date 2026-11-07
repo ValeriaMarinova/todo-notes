@@ -240,6 +240,55 @@ function redoChange(): void {
   validationError.value = ''
 }
 
+function isTextEditingTarget(target: EventTarget | null): boolean {
+  if (
+    target instanceof HTMLTextAreaElement
+    || (target instanceof HTMLElement && target.isContentEditable)
+  ) {
+    return true
+  }
+
+  if (!(target instanceof HTMLInputElement)) {
+    return false
+  }
+
+  return [
+    'text',
+    'search',
+    'email',
+    'url',
+    'tel',
+    'password',
+    'number',
+  ].includes(target.type)
+}
+
+function handleHistoryShortcut(event: KeyboardEvent): void {
+  const isUndoShortcut = (
+    event.ctrlKey
+    || event.metaKey
+  ) && event.key.toLowerCase() === 'z'
+
+  if (
+    !isUndoShortcut
+    || event.altKey
+    || event.defaultPrevented
+    || pendingAction.value !== null
+    || isTextEditingTarget(event.target)
+  ) {
+    return
+  }
+
+  event.preventDefault()
+
+  if (event.shiftKey) {
+    redoChange()
+    return
+  }
+
+  undoChange()
+}
+
 async function saveDraft(): Promise<void> {
   if (draft.value === null) {
     return
@@ -324,6 +373,14 @@ async function confirmEditorAction(): Promise<void> {
 
 watch(noteId, initializeDraft, {
   immediate: true,
+})
+
+onMounted(() => {
+  window.addEventListener('keydown', handleHistoryShortcut)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleHistoryShortcut)
 })
 
 useHead({
