@@ -1,4 +1,4 @@
-import type { TodoItem } from '~/types/note'
+import type { Note, TodoItem } from '~/types/note'
 
 export const HISTORY_LIMIT = 50
 
@@ -83,4 +83,74 @@ export function takeRedoOperation(
 export function clearNoteHistory(history: NoteHistory): void {
   history.past = []
   history.future = []
+}
+
+export type HistoryDirection = 'undo' | 'redo'
+
+function removeTodo(note: Note, todoId: string): void {
+  const index = note.todos.findIndex(todo => todo.id === todoId)
+
+  if (index !== -1) {
+    note.todos.splice(index, 1)
+  }
+}
+
+function insertTodo(note: Note, todo: TodoItem, index: number): void {
+  note.todos.splice(index, 0, { ...todo })
+}
+
+export function applyHistoryOperation(
+  note: Note,
+  operation: HistoryOperation,
+  direction: HistoryDirection,
+): void {
+  const usePreviousValue = direction === 'undo'
+
+  switch (operation.type) {
+    case 'title-change':
+      note.title = usePreviousValue
+        ? operation.before
+        : operation.after
+      break
+
+    case 'todo-text-change': {
+      const todo = note.todos.find(item => item.id === operation.todoId)
+
+      if (todo) {
+        todo.text = usePreviousValue
+          ? operation.before
+          : operation.after
+      }
+
+      break
+    }
+
+    case 'todo-completed-change': {
+      const todo = note.todos.find(item => item.id === operation.todoId)
+
+      if (todo) {
+        todo.completed = usePreviousValue
+          ? operation.before
+          : operation.after
+      }
+
+      break
+    }
+
+    case 'todo-add':
+      if (direction === 'undo') {
+        removeTodo(note, operation.todo.id)
+      } else {
+        insertTodo(note, operation.todo, operation.index)
+      }
+      break
+
+    case 'todo-remove':
+      if (direction === 'undo') {
+        insertTodo(note, operation.todo, operation.index)
+      } else {
+        removeTodo(note, operation.todo.id)
+      }
+      break
+  }
 }
