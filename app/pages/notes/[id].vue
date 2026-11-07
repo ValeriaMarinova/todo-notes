@@ -2,9 +2,21 @@
 import type { Note } from '~/types/note'
 import { createNote, cloneNote, createTodoItem } from '~/utils/noteFactory'
 import { useNotesStore } from '~/stores/notes'
+import {
+  addHistoryOperation,
+  applyHistoryOperation,
+  clearNoteHistory,
+  createNoteHistory,
+  takeRedoOperation,
+  takeUndoOperation,
+} from '~/utils/noteHistory'
 
 const route = useRoute()
 const notesStore = useNotesStore()
+const history = reactive(createNoteHistory())
+
+const canUndo = computed(() => history.past.length > 0)
+const canRedo = computed(() => history.future.length > 0)
 
 const draft = ref<Note | null>(null)
 const isNotFound = ref(false)
@@ -35,6 +47,7 @@ const dialogConfirmLabel = computed(() => (
 ))
 
 function initializeDraft(): void {
+  clearNoteHistory(history)
   isNotFound.value = false
   validationError.value = ''
 
@@ -59,7 +72,17 @@ function addTodo(): void {
     return
   }
 
-  draft.value.todos.push(createTodoItem())
+  const todo = createTodoItem()
+  const index = draft.value.todos.length
+
+  draft.value.todos.push(todo)
+
+  addHistoryOperation(history, {
+    type: 'todo-add',
+    todo: { ...todo },
+    index,
+  })
+
   validationError.value = ''
 }
 
@@ -68,9 +91,81 @@ function removeTodo(todoId: string): void {
     return
   }
 
-  draft.value.todos = draft.value.todos.filter(
-    todo => todo.id !== todoId,
+  const index = draft.value.todos.findIndex(
+    todo => todo.id === todoId,
   )
+
+  if (index === -1) {
+    return
+  }
+
+  const removedTodo = draft.value.todos.splice(index, 1)[0]
+
+  if (removedTodo === undefined) {
+    return
+  }
+
+  addHistoryOperation(history, {
+    type: 'todo-remove',
+    todo: { ...removedTodo },
+    index,
+  })
+}
+
+function toggleTodo(todoId: string): void {
+  if (draft.value === null) {
+    return
+  }
+
+  const todo = draft.value.todos.find(
+    item => item.id === todoId,
+  )
+
+  if (todo === undefined) {
+    return
+  }
+
+  const before = todo.completed
+  const after = !before
+
+  todo.completed = after
+
+  addHistoryOperation(history, {
+    type: 'todo-completed-change',
+    todoId,
+    before,
+    after,
+  })
+}
+
+function undoChange(): void {
+  if (draft.value === null) {
+    return
+  }
+
+  const operation = takeUndoOperation(history)
+
+  if (operation === undefined) {
+    return
+  }
+
+  applyHistoryOperation(draft.value, operation, 'undo')
+  validationError.value = ''
+}
+
+function redoChange(): void {
+  if (draft.value === null) {
+    return
+  }
+
+  const operation = takeRedoOperation(history)
+
+  if (operation === undefined) {
+    return
+  }
+
+  applyHistoryOperation(draft.value, operation, 'redo')
+  validationError.value = ''
 }
 
 async function saveDraft(): Promise<void> {
@@ -107,6 +202,7 @@ async function saveDraft(): Promise<void> {
     return
   }
 
+  clearNoteHistory(history)
   await navigateTo('/')
 }
 
@@ -131,6 +227,7 @@ function closeActionDialog(): void {
 async function confirmEditorAction(): Promise<void> {
   if (pendingAction.value === 'cancel') {
     pendingAction.value = null
+    clearNoteHistory(history)
     await navigateTo('/')
     return
   }
@@ -148,6 +245,7 @@ async function confirmEditorAction(): Promise<void> {
       return
     }
 
+    clearNoteHistory(history)
     await navigateTo('/')
   }
 }
@@ -196,6 +294,24 @@ useHead({
         {{ isNewNote ? 'Новая заметка' : 'Редактирование заметки' }}
       </h1>
 
+      <div>
+        <button
+          type="button"
+          :disabled="!canUndo"
+          @click="undoChange"
+        >
+          Отменить изменение
+        </button>
+
+        <button
+          type="button"
+          :disabled="!canRedo"
+          @click="redoChange"
+        >
+          Повторить изменение
+        </button>
+      </div>
+
       <form @submit.prevent="saveDraft">
         <div>
           <label for="note-title">Название заметки</label>
@@ -221,8 +337,9 @@ useHead({
           >
             <input
               :id="`todo-completed-${todo.id}`"
-              v-model="todo.completed"
+              :checked="todo.completed"
               type="checkbox"
+              @change="toggleTodo(todo.id)"
             >
 
             <label :for="`todo-text-${todo.id}`">
@@ -280,20 +397,20 @@ useHead({
       </form>
     </section>
 
-      <p
-        v-if="actionError"
-        role="alert"
-      >
-        {{ actionError }}
-      </p>
+    <p
+      v-if="actionError"
+      role="alert"
+    >
+      {{ actionError }}
+    </p>
 
-      <ConfirmDialog
-        :open="pendingAction !== null"
-        :title="dialogTitle"
-        :message="dialogMessage"
-        :confirm-label="dialogConfirmLabel"
-        @confirm="confirmEditorAction"
-        @cancel="closeActionDialog"
-      />
-    </main>
+    <ConfirmDialog
+      :open="pendingAction !== null"
+      :title="dialogTitle"
+      :message="dialogMessage"
+      :confirm-label="dialogConfirmLabel"
+      @confirm="confirmEditorAction"
+      @cancel="closeActionDialog"
+    />
+  </main>
 </template>
