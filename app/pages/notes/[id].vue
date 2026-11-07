@@ -17,6 +17,8 @@ const history = reactive(createNoteHistory())
 
 const canUndo = computed(() => history.past.length > 0)
 const canRedo = computed(() => history.future.length > 0)
+const titleBeforeEdit = ref<string | null>(null)
+const todoTextBeforeEdit = new Map<string, string>()
 
 const draft = ref<Note | null>(null)
 const isNotFound = ref(false)
@@ -48,6 +50,8 @@ const dialogConfirmLabel = computed(() => (
 
 function initializeDraft(): void {
   clearNoteHistory(history)
+  titleBeforeEdit.value = null
+  todoTextBeforeEdit.clear()
   isNotFound.value = false
   validationError.value = ''
 
@@ -135,6 +139,74 @@ function toggleTodo(todoId: string): void {
     todoId,
     before,
     after,
+  })
+}
+
+function startTitleEdit(): void {
+  if (draft.value === null) {
+    return
+  }
+
+  titleBeforeEdit.value = draft.value.title
+}
+
+function finishTitleEdit(): void {
+  if (
+    draft.value === null
+    || titleBeforeEdit.value === null
+  ) {
+    return
+  }
+
+  const before = titleBeforeEdit.value
+  const after = draft.value.title
+
+  titleBeforeEdit.value = null
+
+  if (before === after) {
+    return
+  }
+
+  addHistoryOperation(history, {
+    type: 'title-change',
+    before,
+    after,
+  })
+}
+
+function startTodoTextEdit(todoId: string): void {
+  const todo = draft.value?.todos.find(
+    item => item.id === todoId,
+  )
+
+  if (todo === undefined) {
+    return
+  }
+
+  todoTextBeforeEdit.set(todoId, todo.text)
+}
+
+function finishTodoTextEdit(todoId: string): void {
+  const todo = draft.value?.todos.find(
+    item => item.id === todoId,
+  )
+  const before = todoTextBeforeEdit.get(todoId)
+
+  todoTextBeforeEdit.delete(todoId)
+
+  if (
+    todo === undefined
+    || before === undefined
+    || before === todo.text
+  ) {
+    return
+  }
+
+  addHistoryOperation(history, {
+    type: 'todo-text-change',
+    todoId,
+    before,
+    after: todo.text,
   })
 }
 
@@ -321,6 +393,8 @@ useHead({
             v-model="draft.title"
             type="text"
             autocomplete="off"
+            @focus="startTitleEdit"
+            @blur="finishTitleEdit"
           >
         </div>
 
@@ -351,6 +425,8 @@ useHead({
               v-model="todo.text"
               type="text"
               autocomplete="off"
+              @focus="startTodoTextEdit(todo.id)"
+              @blur="finishTodoTextEdit(todo.id)"
             >
 
             <button
