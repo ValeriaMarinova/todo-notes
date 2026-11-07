@@ -7,11 +7,13 @@ interface Props {
   message: string
   confirmLabel?: string
   cancelLabel?: string
+  danger?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   confirmLabel: 'Подтвердить',
   cancelLabel: 'Отмена',
+  danger: true,
 })
 
 const emit = defineEmits<{
@@ -84,7 +86,8 @@ function handleEscape(event: Event): void {
 
       <button
         type="button"
-        class="delete-button"
+        class="confirm-button"
+        :class="danger ? 'danger-button' : 'primary-button'"
         @click="emit('confirm')"
       >
         {{ confirmLabel }}
@@ -128,7 +131,7 @@ function handleEscape(event: Event): void {
 }
 
 .cancel-button,
-.delete-button {
+.confirm-button {
   min-height: 2.75rem;
   padding: 0.625rem 1rem;
   font: inherit;
@@ -146,18 +149,28 @@ function handleEscape(event: Event): void {
   background: #f9fafb;
 }
 
-.delete-button {
+.danger-button {
   color: #ffffff;
   background: #b42318;
   border: 1px solid #b42318;
 }
 
-.delete-button:hover {
+.danger-button:hover {
   background: #912018;
 }
 
+.primary-button {
+  color: #ffffff;
+  background: #175cd3;
+  border: 1px solid #175cd3;
+}
+
+.primary-button:hover {
+  background: #1849a9;
+}
+
 .cancel-button:focus-visible,
-.delete-button:focus-visible {
+.confirm-button:focus-visible {
   outline: 3px solid #84adff;
   outline-offset: 2px;
 }
@@ -168,7 +181,7 @@ function handleEscape(event: Event): void {
   }
 
   .cancel-button,
-  .delete-button {
+  .confirm-button {
     width: 100%;
   }
 }

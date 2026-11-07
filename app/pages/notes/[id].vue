@@ -10,6 +10,14 @@ import {
   takeRedoOperation,
   takeUndoOperation,
 } from '~/utils/noteHistory'
+import type { StoredDraft } from '~/utils/draftStorage'
+import {
+  loadDraftFromStorage,
+  removeDraftFromStorage,
+  saveDraftToStorage,
+} from '~/utils/draftStorage'
+
+const DRAFT_SAVE_DELAY = 700
 
 const route = useRoute()
 const notesStore = useNotesStore()
@@ -23,32 +31,63 @@ const todoTextBeforeEdit = new Map<string, string>()
 const draft = ref<Note | null>(null)
 const isNotFound = ref(false)
 const validationError = ref('')
-type EditorAction = 'cancel' | 'delete' | null
+const isDraftTrackingEnabled = ref(false)
+const pendingStoredDraft = ref<StoredDraft | null>(null)
+let draftBaseline: Note | null = null
+let draftSaveTimer: ReturnType<typeof setTimeout> | null = null
+type EditorAction = 'cancel' | 'delete' | 'restore' | null
 
 const pendingAction = ref<EditorAction>(null)
 const actionError = ref('')
 
 const noteId = computed(() => String(route.params.id ?? ''))
 const isNewNote = computed(() => noteId.value === 'new')
-const dialogTitle = computed(() => (
-  pendingAction.value === 'delete'
+const dialogTitle = computed(() => {
+  if (pendingAction.value === 'restore') {
+    return 'Восстановить черновик?'
+  }
+
+  return pendingAction.value === 'delete'
     ? 'Удалить заметку?'
     : 'Отменить редактирование?'
-))
+})
 
-const dialogMessage = computed(() => (
-  pendingAction.value === 'delete'
+const dialogMessage = computed(() => {
+  if (pendingAction.value === 'restore') {
+    return 'Найдены несохранённые изменения. Если не восстановить их, черновик будет удалён.'
+  }
+
+  return pendingAction.value === 'delete'
     ? 'Заметка будет удалена безвозвратно.'
     : 'Все несохранённые изменения будут потеряны.'
-))
+})
 
-const dialogConfirmLabel = computed(() => (
-  pendingAction.value === 'delete'
+const dialogConfirmLabel = computed(() => {
+  if (pendingAction.value === 'restore') {
+    return 'Восстановить'
+  }
+
+  return pendingAction.value === 'delete'
     ? 'Удалить'
     : 'Отменить редактирование'
+})
+
+const dialogCancelLabel = computed(() => (
+  pendingAction.value === 'restore'
+    ? 'Не восстанавливать'
+    : 'Отмена'
 ))
 
+const isDialogDangerous = computed(
+  () => pendingAction.value !== 'restore',
+)
+
 function initializeDraft(): void {
+  stopDraftSaveTimer()
+  isDraftTrackingEnabled.value = false
+  pendingStoredDraft.value = null
+  pendingAction.value = null
+  draftBaseline = null
   clearNoteHistory(history)
   titleBeforeEdit.value = null
   todoTextBeforeEdit.clear()
@@ -56,7 +95,11 @@ function initializeDraft(): void {
   validationError.value = ''
 
   if (isNewNote.value) {
-    draft.value = createNote()
+    const newNote = createNote()
+
+    draft.value = newNote
+    draftBaseline = cloneNote(newNote)
+    offerDraftRecovery()
     return
   }
 
@@ -68,7 +111,103 @@ function initializeDraft(): void {
     return
   }
 
-  draft.value = cloneNote(savedNote)
+  const savedNoteCopy = cloneNote(savedNote)
+
+  draft.value = savedNoteCopy
+  draftBaseline = cloneNote(savedNoteCopy)
+  offerDraftRecovery()
+}
+
+function notesAreEqual(first: Note, second: Note): boolean {
+  return JSON.stringify(first) === JSON.stringify(second)
+}
+
+function stopDraftSaveTimer(): void {
+  if (draftSaveTimer === null) {
+    return
+  }
+
+  clearTimeout(draftSaveTimer)
+  draftSaveTimer = null
+}
+
+function clearStoredDraft(): void {
+  stopDraftSaveTimer()
+
+  if (import.meta.client) {
+    removeDraftFromStorage(noteId.value)
+  }
+}
+
+function persistDraftNow(): void {
+  stopDraftSaveTimer()
+
+  if (
+    !import.meta.client
+    || !isDraftTrackingEnabled.value
+    || draft.value === null
+    || draftBaseline === null
+  ) {
+    return
+  }
+
+  if (notesAreEqual(draft.value, draftBaseline)) {
+    removeDraftFromStorage(noteId.value)
+    return
+  }
+
+  const isSaved = saveDraftToStorage(
+    noteId.value,
+    draft.value,
+  )
+
+  if (!isSaved) {
+    actionError.value = 'Не удалось сохранить черновик.'
+  }
+}
+
+function scheduleDraftSave(): void {
+  if (!isDraftTrackingEnabled.value) {
+    return
+  }
+
+  stopDraftSaveTimer()
+  draftSaveTimer = setTimeout(
+    persistDraftNow,
+    DRAFT_SAVE_DELAY,
+  )
+}
+
+function offerDraftRecovery(): void {
+  if (!import.meta.client || draft.value === null) {
+    isDraftTrackingEnabled.value = true
+    return
+  }
+
+  const storedDraft = loadDraftFromStorage(noteId.value)
+
+  if (storedDraft === null) {
+    isDraftTrackingEnabled.value = true
+    return
+  }
+
+  const isCompatible = isNewNote.value
+    || (
+      storedDraft.note.id === draft.value.id
+      && storedDraft.note.updatedAt === draft.value.updatedAt
+    )
+
+  if (
+    !isCompatible
+    || notesAreEqual(storedDraft.note, draft.value)
+  ) {
+    removeDraftFromStorage(noteId.value)
+    isDraftTrackingEnabled.value = true
+    return
+  }
+
+  pendingStoredDraft.value = storedDraft
+  pendingAction.value = 'restore'
 }
 
 function addTodo(): void {
@@ -323,6 +462,8 @@ async function saveDraft(): Promise<void> {
     return
   }
 
+  isDraftTrackingEnabled.value = false
+  clearStoredDraft()
   clearNoteHistory(history)
   await navigateTo('/')
 }
@@ -342,12 +483,42 @@ function requestDelete(): void {
 }
 
 function closeActionDialog(): void {
+  if (pendingAction.value === 'restore') {
+    isDraftTrackingEnabled.value = false
+    clearStoredDraft()
+    pendingStoredDraft.value = null
+    pendingAction.value = null
+    isDraftTrackingEnabled.value = true
+    return
+  }
+
   pendingAction.value = null
 }
 
 async function confirmEditorAction(): Promise<void> {
+  if (pendingAction.value === 'restore') {
+    const storedDraft = pendingStoredDraft.value
+
+    pendingStoredDraft.value = null
+    pendingAction.value = null
+
+    if (storedDraft !== null) {
+      draft.value = cloneNote(storedDraft.note)
+      clearNoteHistory(history)
+      titleBeforeEdit.value = null
+      todoTextBeforeEdit.clear()
+      validationError.value = ''
+      actionError.value = ''
+    }
+
+    isDraftTrackingEnabled.value = true
+    return
+  }
+
   if (pendingAction.value === 'cancel') {
     pendingAction.value = null
+    isDraftTrackingEnabled.value = false
+    clearStoredDraft()
     clearNoteHistory(history)
     await navigateTo('/')
     return
@@ -366,6 +537,8 @@ async function confirmEditorAction(): Promise<void> {
       return
     }
 
+    isDraftTrackingEnabled.value = false
+    clearStoredDraft()
     clearNoteHistory(history)
     await navigateTo('/')
   }
@@ -375,12 +548,22 @@ watch(noteId, initializeDraft, {
   immediate: true,
 })
 
+watch(
+  draft,
+  scheduleDraftSave,
+  { deep: true },
+)
+
 onMounted(() => {
   window.addEventListener('keydown', handleHistoryShortcut)
+  window.addEventListener('pagehide', persistDraftNow)
 })
 
 onBeforeUnmount(() => {
+  persistDraftNow()
   window.removeEventListener('keydown', handleHistoryShortcut)
+  window.removeEventListener('pagehide', persistDraftNow)
+  stopDraftSaveTimer()
 })
 
 useHead({
@@ -542,6 +725,8 @@ useHead({
       :title="dialogTitle"
       :message="dialogMessage"
       :confirm-label="dialogConfirmLabel"
+      :cancel-label="dialogCancelLabel"
+      :danger="isDialogDangerous"
       @confirm="confirmEditorAction"
       @cancel="closeActionDialog"
     />
