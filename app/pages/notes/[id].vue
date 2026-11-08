@@ -30,6 +30,7 @@ const todoTextBeforeEdit = new Map<string, string>()
 
 const draft = ref<Note | null>(null)
 const isNotFound = ref(false)
+const isDeletedExternally = ref(false)
 const validationError = ref('')
 const isDraftTrackingEnabled = ref(false)
 const pendingStoredDraft = ref<StoredDraft | null>(null)
@@ -92,6 +93,7 @@ function initializeDraft(): void {
   titleBeforeEdit.value = null
   todoTextBeforeEdit.clear()
   isNotFound.value = false
+  isDeletedExternally.value = false
   validationError.value = ''
 
   if (isNewNote.value) {
@@ -554,6 +556,24 @@ watch(
   { deep: true },
 )
 
+watch(
+  () => notesStore.getNoteById(noteId.value) !== undefined,
+  (noteExists, noteExistedBefore) => {
+    if (isNewNote.value || isNotFound.value) {
+      return
+    }
+
+    if (noteExistedBefore && !noteExists) {
+      isDeletedExternally.value = true
+      return
+    }
+
+    if (noteExists) {
+      isDeletedExternally.value = false
+    }
+  },
+)
+
 onMounted(() => {
   window.addEventListener('keydown', handleHistoryShortcut)
   window.addEventListener('pagehide', persistDraftNow)
@@ -605,6 +625,14 @@ useHead({
       <h1>
         {{ isNewNote ? 'Новая заметка' : 'Редактирование заметки' }}
       </h1>
+
+      <p
+        v-if="isDeletedExternally"
+        role="status"
+      >
+        Эта заметка была удалена в другой вкладке.
+        Вы можете продолжить редактирование и сохранить её заново.
+      </p>
 
       <div>
         <button
@@ -704,7 +732,7 @@ useHead({
         </button>
 
         <button
-          v-if="!isNewNote"
+          v-if="!isNewNote && !isDeletedExternally"
           type="button"
           @click="requestDelete"
         >
