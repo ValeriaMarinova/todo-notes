@@ -600,9 +600,10 @@ useHead({
 </script>
 
 <template>
-  <main>
+  <main class="editor-page">
     <NuxtLink
       v-if="isNotFound"
+      class="back-control"
       to="/"
     >
       Назад к заметкам
@@ -610,32 +611,43 @@ useHead({
 
     <button
       v-else
+      class="back-control"
       type="button"
       @click="requestCancel"
     >
       Назад к заметкам
     </button>
 
-    <section v-if="isNotFound">
-      <h1>Заметка не найдена</h1>
+    <section
+      v-if="isNotFound"
+      class="not-found-panel"
+    >
+      <h1 class="page-title">
+        Заметка не найдена
+      </h1>
       <p>Возможно, она была удалена или адрес указан неверно.</p>
     </section>
 
-    <section v-else-if="draft">
-      <h1>
+    <section
+      v-else-if="draft"
+      class="editor-panel"
+    >
+      <h1 class="page-title">
         {{ isNewNote ? 'Новая заметка' : 'Редактирование заметки' }}
       </h1>
 
       <p
         v-if="isDeletedExternally"
+        class="info-message"
         role="status"
       >
         Эта заметка была удалена в другой вкладке.
         Вы можете продолжить редактирование и сохранить её заново.
       </p>
 
-      <div>
+      <div class="history-controls">
         <button
+          class="history-button"
           type="button"
           :disabled="!canUndo"
           @click="undoChange"
@@ -644,6 +656,7 @@ useHead({
         </button>
 
         <button
+          class="history-button"
           type="button"
           :disabled="!canRedo"
           @click="redoChange"
@@ -652,13 +665,22 @@ useHead({
         </button>
       </div>
 
-      <form @submit.prevent="saveDraft">
-        <div>
-          <label for="note-title">Название заметки</label>
+      <form
+        class="editor-form"
+        @submit.prevent="saveDraft"
+      >
+        <div class="field-group">
+          <label
+            class="field-label"
+            for="note-title"
+          >
+            Название заметки
+          </label>
 
           <input
             id="note-title"
             v-model="draft.title"
+            class="text-input"
             type="text"
             autocomplete="off"
             @focus="startTitleEdit"
@@ -666,31 +688,45 @@ useHead({
           >
         </div>
 
-        <h2>Задачи</h2>
+        <h2 class="tasks-title">
+          Задачи
+        </h2>
 
-        <p v-if="draft.todos.length === 0">
+        <p
+          v-if="draft.todos.length === 0"
+          class="tasks-empty"
+        >
           В заметке пока нет задач.
         </p>
 
-        <ul v-else>
+        <ul
+          v-else
+          class="todo-list"
+        >
           <li
             v-for="todo in draft.todos"
             :key="todo.id"
+            class="todo-row"
           >
             <input
               :id="`todo-completed-${todo.id}`"
               :checked="todo.completed"
+              class="todo-checkbox"
               type="checkbox"
               @change="toggleTodo(todo.id)"
             >
 
-            <label :for="`todo-text-${todo.id}`">
+            <label
+              class="visually-hidden"
+              :for="`todo-text-${todo.id}`"
+            >
               Текст задачи
             </label>
 
             <input
               :id="`todo-text-${todo.id}`"
               v-model="todo.text"
+              class="todo-input"
               type="text"
               autocomplete="off"
               @focus="startTodoTextEdit(todo.id)"
@@ -698,6 +734,7 @@ useHead({
             >
 
             <button
+              class="remove-todo"
               type="button"
               @click="removeTodo(todo.id)"
             >
@@ -707,6 +744,7 @@ useHead({
         </ul>
 
         <button
+          class="add-button"
           type="button"
           @click="addTodo"
         >
@@ -715,34 +753,43 @@ useHead({
 
         <p
           v-if="validationError"
+          class="error-message"
           role="alert"
         >
           {{ validationError }}
         </p>
 
-        <button type="submit">
-          Сохранить
-        </button>
+        <div class="form-actions">
+          <button
+            class="primary-button"
+            type="submit"
+          >
+            Сохранить
+          </button>
 
-        <button
-          type="button"
-          @click="requestCancel"
-        >
-          Отменить редактирование
-        </button>
+          <button
+            class="secondary-button"
+            type="button"
+            @click="requestCancel"
+          >
+            Отменить редактирование
+          </button>
 
-        <button
-          v-if="!isNewNote && !isDeletedExternally"
-          type="button"
-          @click="requestDelete"
-        >
-          Удалить заметку
-        </button>
+          <button
+            v-if="!isNewNote && !isDeletedExternally"
+            class="danger-button"
+            type="button"
+            @click="requestDelete"
+          >
+            Удалить заметку
+          </button>
+        </div>
       </form>
     </section>
 
     <p
       v-if="actionError"
+      class="error-message page-error"
       role="alert"
     >
       {{ actionError }}
@@ -760,3 +807,357 @@ useHead({
     />
   </main>
 </template>
+
+<style scoped lang="scss">
+.editor-page {
+  width: min(100% - 2rem, 56rem);
+  margin: 0 auto;
+  padding: 2.5rem 0 5rem;
+}
+
+.back-control {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  margin-bottom: 1.25rem;
+  color: #52627a;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  transition: color 150ms ease;
+}
+
+.back-control::before {
+  margin-right: 0.45rem;
+  content: "←";
+}
+
+.back-control:hover {
+  color: var(--primary);
+}
+
+.editor-panel,
+.not-found-panel {
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  background: rgb(255 255 255 / 94%);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.page-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: clamp(2rem, 6vw, 3.15rem);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+
+.info-message,
+.error-message {
+  padding: 0.9rem 1rem;
+  border-radius: 0.75rem;
+  line-height: 1.5;
+}
+
+.info-message {
+  margin: 1.5rem 0 0;
+  color: #1849a9;
+  background: #eff4ff;
+  border: 1px solid #b2ccff;
+}
+
+.error-message {
+  margin: 1.25rem 0 0;
+  color: #912018;
+  background: #fff1f0;
+  border: 1px solid #fecdca;
+}
+
+.page-error {
+  max-width: 56rem;
+  margin-inline: auto;
+}
+
+.history-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding-bottom: 1.5rem;
+  margin-top: 1.75rem;
+  border-bottom: 1px solid #e8edf4;
+}
+
+.history-button,
+.add-button,
+.remove-todo,
+.primary-button,
+.secondary-button,
+.danger-button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 1rem;
+  font-weight: 680;
+  line-height: 1.1;
+  cursor: pointer;
+  border-radius: 0.7rem;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.history-button,
+.secondary-button {
+  color: #3e4c63;
+  background: #ffffff;
+  border: 1px solid #cfd8e6;
+}
+
+.history-button:hover:not(:disabled),
+.secondary-button:hover {
+  color: var(--primary);
+  background: #f6f8ff;
+  border-color: #9eb2ef;
+}
+
+.history-button:disabled {
+  color: #9aa6b7;
+  cursor: not-allowed;
+  background: #f5f7fa;
+  border-color: #e1e6ee;
+}
+
+.editor-form {
+  margin-top: 1.75rem;
+}
+
+.field-group {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.field-label {
+  color: #344054;
+  font-size: 0.92rem;
+  font-weight: 720;
+}
+
+.text-input,
+.todo-input {
+  width: 100%;
+  min-width: 0;
+  color: var(--text);
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 4%);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.text-input {
+  min-height: 3.25rem;
+  padding: 0.75rem 0.9rem;
+  font-size: 1.05rem;
+}
+
+.todo-input {
+  min-height: 2.75rem;
+  padding: 0.6rem 0.8rem;
+}
+
+.text-input:hover,
+.todo-input:hover {
+  border-color: #a8b5c8;
+}
+
+.text-input:focus,
+.todo-input:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 4px rgb(49 87 213 / 12%);
+}
+
+.tasks-title {
+  padding-top: 1.75rem;
+  margin: 2rem 0 1rem;
+  font-size: 1.35rem;
+  letter-spacing: -0.025em;
+  border-top: 1px solid #e8edf4;
+}
+
+.tasks-empty {
+  padding: 1.25rem;
+  margin: 0 0 1rem;
+  color: var(--muted);
+  text-align: center;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 0.8rem;
+}
+
+.todo-list {
+  display: grid;
+  padding: 0;
+  margin: 0 0 1rem;
+  gap: 0.75rem;
+  list-style: none;
+}
+
+.todo-row {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  padding: 0.7rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+}
+
+.todo-row:focus-within {
+  background: #ffffff;
+  border-color: #b7c6f6;
+}
+
+.todo-checkbox {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.remove-todo {
+  min-height: 2.5rem;
+  padding-inline: 0.8rem;
+  color: var(--danger);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.remove-todo:hover {
+  color: #ffffff;
+  background: var(--danger);
+}
+
+.add-button {
+  color: var(--primary);
+  background: #edf2ff;
+  border: 1px solid #c7d4ff;
+}
+
+.add-button::before {
+  margin-right: 0.35rem;
+  font-size: 1.15rem;
+  content: "+";
+}
+
+.add-button:hover {
+  color: #ffffff;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: 1.5rem;
+  margin-top: 1.75rem;
+  border-top: 1px solid #e8edf4;
+}
+
+.primary-button {
+  color: #ffffff;
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  box-shadow: 0 0.5rem 1rem rgb(49 87 213 / 16%);
+}
+
+.primary-button:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.danger-button {
+  margin-left: auto;
+  color: var(--danger);
+  background: #ffffff;
+  border: 1px solid #efb5b1;
+}
+
+.danger-button:hover {
+  color: #ffffff;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.not-found-panel {
+  padding-block: 4rem;
+  text-align: center;
+}
+
+.not-found-panel p {
+  max-width: 34rem;
+  margin: 1rem auto 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+@media (max-width: 42rem) {
+  .editor-page {
+    width: min(100% - 1.25rem, 56rem);
+    padding: 1.25rem 0 3rem;
+  }
+
+  .editor-panel,
+  .not-found-panel {
+    border-radius: 1rem;
+  }
+
+  .todo-row {
+    align-items: center;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .remove-todo {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .form-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .danger-button {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 28rem) {
+  .history-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .history-button,
+  .add-button {
+    width: 100%;
+  }
+}
+</style>

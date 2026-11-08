@@ -98,23 +98,27 @@ function handleEscape(event: Event): void {
 
 <style scoped lang="scss">
 .modal-window {
-  width: min(28rem, calc(100% - 2rem));
-  padding: 1.5rem;
-  color: #1d2939;
+  width: min(30rem, calc(100% - 2rem));
+  max-height: calc(100vh - 2rem);
+  padding: clamp(1.25rem, 5vw, 2rem);
+  overflow: auto;
+  color: var(--text);
   background: #ffffff;
-  border: 0;
-  border-radius: 0.75rem;
-  box-shadow: 0 1.25rem 3rem rgb(0 0 0 / 20%);
+  border: 1px solid rgb(255 255 255 / 45%);
+  border-radius: 1.1rem;
+  box-shadow: 0 1.5rem 4rem rgb(15 23 42 / 28%);
 }
 
 .modal-window::backdrop {
   background: rgb(15 23 42 / 60%);
+  backdrop-filter: blur(3px);
 }
 
 .modal-title {
   margin: 0;
-  font-size: 1.5rem;
-  line-height: 1.3;
+  font-size: clamp(1.4rem, 5vw, 1.75rem);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
 }
 
 .modal-message {
@@ -132,11 +136,15 @@ function handleEscape(event: Event): void {
 
 .cancel-button,
 .confirm-button {
-  min-height: 2.75rem;
-  padding: 0.625rem 1rem;
+  min-height: 3rem;
+  padding: 0.7rem 1.1rem;
   font: inherit;
+  font-weight: 680;
   cursor: pointer;
-  border-radius: 0.5rem;
+  border-radius: 0.7rem;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
 }
 
 .cancel-button {
@@ -151,22 +159,24 @@ function handleEscape(event: Event): void {
 
 .danger-button {
   color: #ffffff;
-  background: #b42318;
-  border: 1px solid #b42318;
+  background: var(--danger);
+  border: 1px solid var(--danger);
 }
 
 .danger-button:hover {
-  background: #912018;
+  background: var(--danger-hover);
+  border-color: var(--danger-hover);
 }
 
 .primary-button {
   color: #ffffff;
-  background: #175cd3;
-  border: 1px solid #175cd3;
+  background: var(--primary);
+  border: 1px solid var(--primary);
 }
 
 .primary-button:hover {
-  background: #1849a9;
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 .cancel-button:focus-visible,
